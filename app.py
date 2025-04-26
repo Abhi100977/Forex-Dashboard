@@ -5,23 +5,19 @@ import pandas as pd
 import ta
 import plotly.graph_objects as go
 
-from binance.client import Client
-
-# Binance API keys (optional: or use environment variables for safety)
-api_key = "your_api_key"
-api_secret = "your_api_secret"
-client = Client(api_key, api_secret)
-
-# Get historical kline/candle data
-def get_klines(symbol, interval, lookback="1 day ago UTC"):
-    frame = pd.DataFrame(client.get_historical_klines(symbol, interval, lookback))
-    if not frame.empty:
-        frame = frame.iloc[:, :6]
-        frame.columns = ['Time', 'open', 'high', 'low', 'close', 'volume']
-        frame = frame.set_index('Time')
-        frame.index = pd.to_datetime(frame.index, unit='ms')
-        frame = frame.astype(float)
-    return frame
+# Simulate a fake get_klines function
+def get_klines(symbol, interval):
+    # Generate dummy data
+    dates = pd.date_range(end=pd.Timestamp.now(), periods=100, freq='5min')
+    close_prices = pd.Series(1800 + (pd.Series(range(100)).apply(lambda x: x*0.5)), index=dates)
+    df = pd.DataFrame({
+        'open': close_prices * 0.99,
+        'high': close_prices * 1.01,
+        'low': close_prices * 0.98,
+        'close': close_prices,
+        'volume': 1
+    }, index=dates)
+    return df
 
 # Streamlit UI
 st.title("📈 Forex Dashboard - Gold & BTC Signals")
@@ -37,14 +33,8 @@ except Exception as e:
     st.error(f"Failed to load data. Error: {e}")
     st.stop()
 
-# Check if DataFrame is empty
 if df.empty:
     st.error("❌ No data fetched. Please try another symbol or timeframe.")
-    st.stop()
-
-# Check if 'close' column exists
-if 'close' not in df.columns:
-    st.error("❌ 'close' column not found in data.")
     st.stop()
 
 # Calculate indicators
