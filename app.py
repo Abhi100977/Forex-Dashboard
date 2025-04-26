@@ -1,55 +1,61 @@
+# app.py
+
 import streamlit as st
 import pandas as pd
-import plotly.graph_objects as go
-import requests
 import ta
+import plotly.graph_objects as go
 
-# Set Streamlit page config
-st.set_page_config(page_title="Forex Dashboard", layout="wide")
+from binance.client import Client
 
-# Title
-st.title("📈 Forex Dashboard - GOLD & BTC Day Trading Signals")
+# Binance API keys (optional: or use environment variables for safety)
+api_key = "your_api_key"
+api_secret = "your_api_secret"
+client = Client(api_key, api_secret)
 
-# Sidebar
-symbol = st.sidebar.selectbox(
-    "Choose a symbol",
-    ["BTCUSDT"]
-)
+# Get historical kline/candle data
+def get_klines(symbol, interval, lookback="1 day ago UTC"):
+    frame = pd.DataFrame(client.get_historical_klines(symbol, interval, lookback))
+    if not frame.empty:
+        frame = frame.iloc[:, :6]
+        frame.columns = ['Time', 'open', 'high', 'low', 'close', 'volume']
+        frame = frame.set_index('Time')
+        frame.index = pd.to_datetime(frame.index, unit='ms')
+        frame = frame.astype(float)
+    return frame
 
-interval = st.sidebar.selectbox(
-    "Choose timeframe",
-    ["1m", "5m", "15m", "1h", "4h", "1d"]
-)
+# Streamlit UI
+st.title("📈 Forex Dashboard - Gold & BTC Signals")
 
-# Function to fetch data
-def get_klines(symbol, interval, limit=100):
-    url = f"https://api.binance.com/api/v3/klines?symbol={symbol}&interval={interval}&limit={limit}"
-    data = requests.get(url).json()
-    df = pd.DataFrame(data, columns=[
-        'timestamp', 'open', 'high', 'low', 'close', 'volume', 'close_time',
-        'quote_asset_volume', 'number_of_trades', 'taker_buy_base', 'taker_buy_quote', 'ignore'
-    ])
-    df['timestamp'] = pd.to_datetime(df['timestamp'], unit='ms')
-    df.set_index('timestamp', inplace=True)
-    df = df[['open', 'high', 'low', 'close', 'volume']].astype(float)
-    return df
+# Sidebar - choose symbol and interval
+symbol = st.sidebar.selectbox("Select Symbol", ["BTCUSDT", "XAUUSDT"])
+interval = st.sidebar.selectbox("Select Interval", ["1m", "5m", "15m", "1h", "4h"])
 
 # Fetch data
 try:
     df = get_klines(symbol, interval)
-except:
-    st.error("Failed to load data. Try again later.")
+except Exception as e:
+    st.error(f"Failed to load data. Error: {e}")
     st.stop()
 
-# 🛡️ Check if DataFrame is empty
+# Check if DataFrame is empty
 if df.empty:
     st.error("❌ No data fetched. Please try another symbol or timeframe.")
+    st.stop()
+
+# Check if 'close' column exists
+if 'close' not in df.columns:
+    st.error("❌ 'close' column not found in data.")
     st.stop()
 
 # Calculate indicators
 df['EMA20'] = ta.trend.ema_indicator(df['close'], window=20)
 df['EMA50'] = ta.trend.ema_indicator(df['close'], window=50)
 df['RSI'] = ta.momentum.rsi(df['close'], window=14)
+
+# Check if indicator columns are ready
+if df[['EMA20', 'EMA50', 'RSI']].isnull().values.any():
+    st.error("❌ Indicators could not be calculated correctly.")
+    st.stop()
 
 # Signal Logic
 latest_close = df['close'].iloc[-1]
@@ -64,28 +70,20 @@ elif latest_close < latest_ema20 and latest_ema20 < latest_ema50 and latest_rsi 
 else:
     signal = "⏳ No Clear Signal"
 
+st.subheader(f"Trading Signal for {symbol}: {signal}")
 
-# Display Signal
-st.subheader(f"**Trading Signal for {symbol} ({interval}): {signal}**")
-
-# Plot candlestick chart
-fig = go.Figure(data=[go.Candlestick(
+# Plot chart
+fig = go.Figure()
+fig.add_trace(go.Candlestick(
     x=df.index,
     open=df['open'],
     high=df['high'],
     low=df['low'],
-    close=df['close']
-)])
+    close=df['close'],
+    name='Candlestick'
+))
+fig.add_trace(go.Scatter(x=df.index, y=df['EMA20'], line=dict(color='blue', width=1), name="EMA20"))
+fig.add_trace(go.Scatter(x=df.index, y=df['EMA50'], line=dict(color='orange', width=1), name="EMA50"))
 
-fig.update_layout(
-    title=f"{symbol} Price Chart ({interval})",
-    xaxis_title="Time",
-    yaxis_title="Price",
-    xaxis_rangeslider_visible=False,
-    height=600,
-)
-
+fig.update_layout(title=f"{symbol} Price Chart", xaxis_title="Time", yaxis_title="Price (USD)")
 st.plotly_chart(fig, use_container_width=True)
-
-# Show Table
-st.dataframe(df.tail(10))
