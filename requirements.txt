@@ -2,4 +2,4 @@ streamlit
 pandas
 ta
 plotly
-binance
+python-binance
