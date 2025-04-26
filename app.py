@@ -41,6 +41,11 @@ except:
     st.error("Failed to load data. Try again later.")
     st.stop()
 
+# 🛡️ Check if DataFrame is empty
+if df.empty:
+    st.error("❌ No data fetched. Please try another symbol or timeframe.")
+    st.stop()
+
 # Calculate indicators
 df['EMA20'] = ta.trend.ema_indicator(df['close'], window=20)
 df['EMA50'] = ta.trend.ema_indicator(df['close'], window=50)
@@ -58,6 +63,7 @@ elif latest_close < latest_ema20 and latest_ema20 < latest_ema50 and latest_rsi 
     signal = "📉 Sell Signal"
 else:
     signal = "⏳ No Clear Signal"
+
 
 # Display Signal
 st.subheader(f"**Trading Signal for {symbol} ({interval}): {signal}**")
