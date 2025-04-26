@@ -13,7 +13,7 @@ st.title("📈 Forex Dashboard - GOLD & BTC Day Trading Signals")
 # Sidebar
 symbol = st.sidebar.selectbox(
     "Choose a symbol",
-    ["XAUUSD", "BTCUSDT"]
+    ["BTCUSDT"]
 )
 
 interval = st.sidebar.selectbox(
